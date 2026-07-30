@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Points Bot — Clickable Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#101C15;
+    --panel:#152119;
+    --raised:#1B2B21;
+    --line:#2E4235;
+    --text:#F4F1EA;
+    --text-dim:#93A897;
+    --accent:#E39C6B;
+    --green:#4FD1A0;
+    --danger:#E5697B;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', 'Helvetica Neue', Arial, sans-serif;}
+  html,body{height:100%; background:var(--bg); color:var(--text);}
+  .app{ display:flex; height:100vh; }
+
+  /* Sidebar */
+  .sidebar{
+    width:220px;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    padding:18px 12px;
+    flex-shrink:0;
+  }
+  .sidebar h4{
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin:14px 8px 8px;
+  }
+  .channel{
+    padding:8px 10px;
+    border-radius:6px;
+    font-size:14px;
+    color:var(--text-dim);
+    cursor:default;
+    margin-bottom:2px;
+  }
+  .channel.active{
+    background:var(--raised);
+    color:var(--text);
+    font-weight:600;
+  }
+
+  /* Main */
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .topbar{
+    height:56px;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 20px;
+    flex-shrink:0;
+  }
+  .topbar .chname{ font-weight:700; font-size:15px; }
+  .admin-toggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+  .switch{
+    width:38px; height:20px;
+    background:var(--raised);
+    border:1px solid var(--line);
+    border-radius:20px;
+    position:relative;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .switch .knob{
+    width:14px; height:14px;
+    background:var(--text-dim);
+    border-radius:50%;
+    position:absolute;
+    top:2px; left:3px;
+    transition:left .18s ease, background .18s ease;
+  }
+  .switch.on{ border-color:var(--accent); }
+  .switch.on .knob{ left:21px; background:var(--accent); }
+
+  .feed{
+    flex:1;
+    overflow-y:auto;
+    padding:22px 26px 10px;
+  }
+
+  /* existing posts (static, for context) */
+  .post{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    margin-bottom:12px;
+  }
+  .post .author{ font-size:12.5px; color:var(--green); font-weight:600; margin-bottom:4px; }
+  .post .title{ font-size:15px; font-weight:700; margin-bottom:6px; }
+  .post .meta{ display:flex; gap:16px; font-size:12.5px; color:var(--text-dim); }
+
+  .divider{
+    display:flex; align-items:center; gap:10px;
+    color:var(--text-dim); font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+    margin:22px 0 16px;
+  }
+  .divider::before, .divider::after{ content:""; flex:1; height:1px; background:var(--line); }
+
+  /* chat messages */
+  .msg{ display:flex; gap:12px; margin-bottom:16px; }
+  .avatar{
+    width:36px; height:36px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; flex-shrink:0;
+  }
+  .avatar.user{ background:var(--raised); color:var(--accent); }
+  .avatar.bot{ background:var(--accent); color:#101C15; }
+  .msg .body{ min-width:0; }
+  .msg .who{ font-size:13.5px; font-weight:700; margin-bottom:2px; }
+  .msg .who .tag{ font-size:10.5px; background:var(--accent); color:#101C15; padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:700; }
+  .msg .cmd{ font-size:14px; color:var(--text-dim); }
+
+  .typing{ font-size:13px; color:var(--text-dim); font-style:italic; margin:2px 0 16px 48px; }
+
+  .embed{
+    border-left:3px solid var(--accent);
+    background:var(--raised);
+    border-radius:6px;
+    padding:14px 16px;
+    max-width:420px;
+  }
+  .embed .e-title{ font-size:14px; font-weight:700; margin-bottom:10px; }
+  .embed .row{ display:flex; justify-content:space-between; font-size:13.5px; padding:5px 0; color:var(--text-dim); }
+  .embed .row .v{ color:var(--text); font-weight:600; }
+  .embed .total{ display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:15px; font-weight:700; }
+  .embed .total .v{ color:var(--accent); }
+
+  .embed table{ width:100%; border-collapse:collapse; margin-top:8px; }
+  .embed th, .embed td{ text-align:left; font-size:13px; padding:6px 4px; }
+  .embed th{ color:var(--text-dim); font-weight:600; font-size:11px; text-transform:uppercase; border-bottom:1px solid var(--line); }
+  .embed td:last-child, .embed th:last-child{ text-align:right; color:var(--green); font-weight:700; }
+  .embed tr + tr td{ border-top:1px solid var(--line); }
+
+  .error-msg{
+    border-left:3px solid var(--danger);
+    background:var(--raised);
+    border-radius:6px;
+    padding:12px 16px;
+    max-width:420px;
+    font-size:13.5px;
+    color:var(--text);
+  }
+
+  /* composer */
+  .composer{
+    padding:14px 26px 20px;
+    flex-shrink:0;
+  }
+  .chips{ display:flex; gap:8px; margin-bottom:10px; }
+  .chip{
+    background:var(--raised);
+    border:1px solid var(--line);
+    color:var(--accent);
+    font-size:12.5px;
+    padding:6px 12px;
+    border-radius:16px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .chip:hover{ border-color:var(--accent); }
+  .input-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 14px;
+  }
+  .input-row input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-size:14.5px;
+  }
+  .input-row input::placeholder{ color:var(--text-dim); }
+  .send-btn{
+    background:var(--accent);
+    color:#101C15;
+    border:none;
+    border-radius:8px;
+    padding:8px 14px;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .send-btn:hover{ opacity:0.9; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="sidebar">
+    <h4>Kênh cộng đồng</h4>
+    <div class="channel active" id="chPosts" onclick="switchChannel('posts')"># ai-projects</div>
+    <div class="channel" id="chCommands" onclick="switchChannel('commands')"># bot-commands</div>
+    <h4>Trạng thái</h4>
+    <div class="channel" style="color:var(--text-dim)">🟢 Bot online</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="chname" id="chName"># ai-projects</div>
+      <div class="admin-toggle" id="adminToggleWrap" style="display:none;">
+        <span id="roleLabel">Đang xem: Thành viên</span>
+        <div class="switch" id="adminSwitch"><div class="knob"></div></div>
+      </div>
+    </div>
+
+    <!-- Posts channel: read-only feed -->
+    <div class="feed" id="feedPosts">
+      <div class="post">
+        <div class="author">T038 - Hoang</div>
+        <div class="title">Chia sẻ lộ trình Từ ý tưởng đến sản phẩm AI thực tế</div>
+        <div class="meta"><span>❤️ 37</span><span>💬 15</span><span>1d ago</span></div>
+      </div>
+      <div class="post">
+        <div class="author">T029 - Nguyễn Thanh Hoàn</div>
+        <div class="title">CÁCH SETUP AI LOG CODEX (CODEX nha)</div>
+        <div class="meta"><span>❤️ 7</span><span>💬 2</span><span>2h ago</span></div>
+      </div>
+      <div class="post">
+        <div class="author">T064 - Nguyễn Quốc Anh</div>
+        <div class="title">DeepSeek-OCR</div>
+        <div class="meta"><span>❤️ 2</span><span>💬 0</span><span>1h ago</span></div>
+      </div>
+      <div class="post">
+        <div class="author">T033 - Đặng Quang Trung</div>
+        <div class="title">Cách tải slide bài giảng trên Vlearn</div>
+        <div class="meta"><span>❤️ 2</span><span>💬 2</span><span>3h ago</span></div>
+      </div>
+      <div class="post">
+        <div class="author">G17 - Nguyễn Tuấn Thành</div>
+        <div class="title">[Góc chia sẻ] Prompt Injection giờ không chỉ có trên chatbot</div>
+        <div class="meta"><span>❤️ 12</span><span>💬 4</span><span>5h ago</span></div>
+      </div>
+    </div>
+
+    <!-- Commands channel: bot chat -->
+    <div class="feed" id="feedCommands" style="display:none;">
+      <div class="divider">Dùng lệnh bot ở đây</div>
+      <div id="chatlog"></div>
+    </div>
+
+    <div class="composer" id="composerCommands" style="display:none;">
+      <div class="chips">
+        <div class="chip" onclick="sendCommand('/mypoints')">/mypoints</div>
+        <div class="chip" onclick="sendCommand('/pointsreport')">/pointsreport</div>
+      </div>
+      <div class="input-row">
+        <input id="msgInput" type="text" placeholder="Gõ /mypoints hoặc /pointsreport...">
+        <button class="send-btn" onclick="sendTyped()">Gửi</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const chatlog = document.getElementById('chatlog');
+  const feed = document.getElementById('feedCommands');
+  const input = document.getElementById('msgInput');
+  const adminSwitch = document.getElementById('adminSwitch');
+  const roleLabel = document.getElementById('roleLabel');
+
+  const chPosts = document.getElementById('chPosts');
+  const chCommands = document.getElementById('chCommands');
+  const feedPosts = document.getElementById('feedPosts');
+  const feedCommands = document.getElementById('feedCommands');
+  const composerCommands = document.getElementById('composerCommands');
+  const adminToggleWrap = document.getElementById('adminToggleWrap');
+  const chName = document.getElementById('chName');
+
+  let isAdmin = false;
+
+  function switchChannel(which){
+    if(which === 'posts'){
+      chPosts.classList.add('active');
+      chCommands.classList.remove('active');
+      feedPosts.style.display = 'block';
+      feedCommands.style.display = 'none';
+      composerCommands.style.display = 'none';
+      adminToggleWrap.style.display = 'none';
+      chName.textContent = '# ai-projects';
+    } else {
+      chCommands.classList.add('active');
+      chPosts.classList.remove('active');
+      feedPosts.style.display = 'none';
+      feedCommands.style.display = 'block';
+      composerCommands.style.display = 'block';
+      adminToggleWrap.style.display = 'flex';
+      chName.textContent = '# bot-commands';
+    }
+  }
+
+  adminSwitch.addEventListener('click', () => {
+    isAdmin = !isAdmin;
+    adminSwitch.classList.toggle('on', isAdmin);
+    roleLabel.textContent = isAdmin ? 'Đang xem: Admin' : 'Đang xem: Thành viên';
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') sendTyped();
+  });
+
+  function sendTyped(){
+    const val = input.value.trim();
+    if(!val) return;
+    input.value = '';
+    handleCommand(val);
+  }
+
+  function sendCommand(cmd){
+    handleCommand(cmd);
+  }
+
+  function scrollDown(){
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function addUserMessage(text){
+    const el = document.createElement('div');
+    el.className = 'msg';
+    el.innerHTML = `
+      <div class="avatar user">B</div>
+      <div class="body">
+        <div class="who">Bạn</div>
+        <div class="cmd">${text}</div>
+      </div>`;
+    chatlog.appendChild(el);
+    scrollDown();
+  }
+
+  function addTyping(){
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.textContent = 'Points Bot đang gõ...';
+    el.id = 'typingIndicator';
+    chatlog.appendChild(el);
+    scrollDown();
+  }
+
+  function removeTyping(){
+    const t = document.getElementById('typingIndicator');
+    if(t) t.remove();
+  }
+
+  function addBotEmbed(html){
+    const el = document.createElement('div');
+    el.className = 'msg';
+    el.innerHTML = `
+      <div class="avatar bot">🤖</div>
+      <div class="body">
+        <div class="who">Points Bot <span class="tag">BOT</span></div>
+        ${html}
+      </div>`;
+    chatlog.appendChild(el);
+    scrollDown();
+  }
+
+  function handleCommand(raw){
+    const cmd = raw.trim().toLowerCase();
+    addUserMessage(raw);
+    addTyping();
+
+    setTimeout(() => {
+      removeTyping();
+
+      if(cmd === '/mypoints'){
+        addBotEmbed(`
+          <div class="embed">
+            <div class="e-title">📊 Điểm của bạn</div>
+            <div class="row"><span>Bài đăng đã tạo</span><span class="v">2 (+10)</span></div>
+            <div class="row"><span>❤️ nhận được</span><span class="v">39 (+78)</span></div>
+            <div class="row"><span>💬 nhận được</span><span class="v">12 (+36)</span></div>
+            <div class="row"><span>💬 bạn đã bình luận</span><span class="v">5 (+5)</span></div>
+            <div class="total"><span>Tổng điểm</span><span class="v">129</span></div>
+          </div>
+        `);
+      } else if(cmd === '/pointsreport'){
+        if(!isAdmin){
+          addBotEmbed(`
+            <div class="error-msg">
+              ❌ Bạn cần quyền <b>Admin</b> để dùng lệnh này. Bật "Đang xem: Admin" ở góc trên để thử lại.
+            </div>
+          `);
+        } else {
+          addBotEmbed(`
+            <div class="embed" style="max-width:480px;">
+              <div class="e-title">🏆 Bảng xếp hạng điểm — toàn kênh</div>
+              <table>
+                <tr><th>Thành viên</th><th>Điểm</th></tr>
+                <tr><td>T038 - Hoang</td><td>142</td></tr>
+                <tr><td>G17 - Tuấn Thành</td><td>98</td></tr>
+                <tr><td>T029 - Thanh Hoàn</td><td>61</td></tr>
+                <tr><td>T064 - Quốc Anh</td><td>34</td></tr>
+              </table>
+            </div>
+          `);
+        }
+      } else {
+        addBotEmbed(`
+          <div class="error-msg">
+            ❓ Không nhận diện được lệnh. Thử <b>/mypoints</b> hoặc <b>/pointsreport</b>.
+          </div>
+        `);
+      }
+    }, 600);
+  }
+</script>
+
+</body>
+</html>
