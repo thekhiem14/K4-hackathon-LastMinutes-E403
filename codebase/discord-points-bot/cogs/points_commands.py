@@ -30,13 +30,14 @@ class PointsCommands(commands.Cog):
         description="Xem điểm AI rubric (tính mới / chất lượng / tương tác) của bạn",
     )
     async def mypoints(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(ephemeral=False)
+        await interaction.response.defer(ephemeral=True)
         stats = await self.db.fetch_user_stats(str(interaction.user.id))
 
         if stats is None:
             await interaction.followup.send(
                 f"{interaction.user.mention} chưa có bài nào được AI chấm "
                 "(status=`graded`). Đợi bot chấm post mới, hoặc admin `/regrade` / `/syncnow`.",
+                ephemeral=True,
             )
             return
 
@@ -58,6 +59,7 @@ class PointsCommands(commands.Cog):
         await interaction.followup.send(
             content=f"{interaction.user.mention} đây là điểm AI của bạn:",
             embed=embed,
+            ephemeral=True,
         )
 
     @app_commands.command(
@@ -66,12 +68,13 @@ class PointsCommands(commands.Cog):
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def report(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer(ephemeral=False)
+        await interaction.response.defer(ephemeral=True)
         board = await self.db.fetch_leaderboard()
         if not board:
             await interaction.followup.send(
                 f"{interaction.user.mention} chưa có bản nháp AI nào (`grades`). "
                 "Chấm bài bằng post mới hoặc `/regrade`.",
+                ephemeral=True,
             )
             return
 
@@ -81,6 +84,7 @@ class PointsCommands(commands.Cog):
             content=f"{interaction.user.mention} báo cáo AI rubric — chia-sẻ:",
             embed=embed,
             file=csv_file,
+            ephemeral=True,
         )
 
     @report.error
