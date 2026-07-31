@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import re
 
 import aiosqlite
 
@@ -443,6 +444,86 @@ class Database:
         rows = await cursor.fetchall()
         by_id = {r["post_id"]: _row_to_post(r) for r in rows}
         return [by_id[pid] for pid in post_ids if pid in by_id]
+
+    async def search_posts(self, query: str, *, limit: int = 5) -> list[PostRecord]:
+        """Keyword search over title/body/author_name (case-insensitive)."""
+        tokens = [t for t in re.findall(r"[\wÀ-ỹ]{3,}", query, flags=re.UNICODE)]
+        tokens = tokens[:6]
+        if not tokens:
+            cursor = await self.conn.execute(
+                """
+                SELECT * FROM posts_history
+                WHERE length(trim(body)) > 0
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            return [_row_to_post(r) for r in rows]
+
+        clauses = []
+        params: list[object] = []
+        for tok in tokens:
+            like = f"%{tok}%"
+            clauses.append(
+                "(title LIKE ? COLLATE NOCASE OR body LIKE ? COLLATE NOCASE "
+                "OR author_name LIKE ? COLLATE NOCASE)"
+            )
+            params.extend([like, like, like])
+        where = " OR ".join(clauses)
+        params.append(limit)
+        cursor = await self.conn.execute(
+            f"""
+            SELECT * FROM posts_history
+            WHERE length(trim(body)) > 0 AND ({where})
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+        return [_row_to_post(r) for r in rows]
+
+    async def latest_grade_for_post(self, post_id: str) -> dict[str, Any] | None:
+        cursor = await self.conn.execute(
+            """
+            SELECT status, novelty_score, quality_score, interaction_score,
+                   content_score, total_score, needs_review, escalate_reason, created_at
+            FROM grades
+            WHERE post_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (post_id,),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "status": row["status"],
+            "novelty_score": row["novelty_score"],
+            "quality_score": row["quality_score"],
+            "interaction_score": row["interaction_score"],
+            "content_score": row["content_score"],
+            "total_score": row["total_score"],
+            "needs_review": bool(row["needs_review"]),
+            "escalate_reason": row["escalate_reason"],
+            "created_at": row["created_at"],
+        }
+
+    async def list_recent_posts(self, *, limit: int = 8) -> list[PostRecord]:
+        cursor = await self.conn.execute(
+            """
+            SELECT * FROM posts_history
+            WHERE length(trim(body)) > 0
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [_row_to_post(r) for r in rows]
 
 
 def _row_to_post(row: aiosqlite.Row) -> PostRecord:

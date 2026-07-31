@@ -60,6 +60,35 @@ class OpenRouterClient:
             raise RuntimeError(f"Unexpected chat response: {data!r}") from exc
         return _parse_json((raw or "").strip())
 
+    def generate_text(
+        self,
+        prompt: str,
+        *,
+        system: str,
+        history: list[dict[str, str]] | None = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.4,
+    ) -> str:
+        messages: list[dict[str, str]] = [{"role": "system", "content": system}]
+        for turn in history or []:
+            role = turn.get("role")
+            content = turn.get("content")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": prompt})
+        payload = {
+            "model": self.chat_model,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+        data = self._post("/chat/completions", payload)
+        try:
+            raw = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected chat response: {data!r}") from exc
+        return (raw or "").strip()
+
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(

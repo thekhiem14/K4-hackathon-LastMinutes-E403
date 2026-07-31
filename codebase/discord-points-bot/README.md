@@ -34,6 +34,7 @@ AI qua **OpenRouter**:
 
 | Lệnh | Ai | Việc |
 |---|---|---|
+| Gõ câu hỏi bình thường | mọi người | Bot reply nếu giống câu hỏi (không cần slash); cũng reply khi @bot |
 | `/mypoints` | mọi người | Điểm AI rubric + hạng |
 | `/report` | Admin | Bảng xếp hạng + CSV |
 | `/syncnow` | Admin | Backfill history + embeddings |

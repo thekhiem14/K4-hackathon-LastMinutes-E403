@@ -17,6 +17,7 @@ import discord
 from discord.ext import commands, tasks
 
 from ai.openrouter_client import OpenRouterClient
+from cogs.ask_commands import AskCommands
 from cogs.coach_commands import CoachCommands
 from cogs.points_commands import PointsCommands
 from config import Settings, load_settings
@@ -55,6 +56,7 @@ class GradingBot(commands.Bot):
         self._cycle_lock = asyncio.Lock()
         await self.add_cog(CoachCommands(self))
         await self.add_cog(PointsCommands(self, self.db))
+        await self.add_cog(AskCommands(self, self.db))
 
         guild = discord.Object(id=self.settings.guild_id)
         self.tree.copy_global_to(guild=guild)
@@ -74,7 +76,53 @@ class GradingBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (%s)", self.user, self.user and self.user.id)
+        logger.info("Loaded cogs: %s", list(self.cogs.keys()))
+        guild = self.get_guild(self.settings.guild_id)
+        if guild and self.user:
+            me = guild.me
+            for ch in guild.text_channels:
+                perms = ch.permissions_for(me)
+                if ch.name.lower() in {"general", "chat", "bot"} or not perms.view_channel:
+                    logger.info(
+                        "Channel #%s view=%s send=%s read_history=%s",
+                        ch.name,
+                        perms.view_channel,
+                        perms.send_messages,
+                        perms.read_message_history,
+                    )
         self.loop.create_task(self.run_cycle(reason="startup"))
+
+    async def on_message(self, message: discord.Message) -> None:
+        if (
+            message.guild
+            and message.guild.id == self.settings.guild_id
+            and self.user is not None
+            and not message.author.bot
+        ):
+            ch_name = getattr(message.channel, "name", str(message.channel.id))
+            me = message.guild.me
+            mentioned = _is_bot_ping(message, self.user, me)
+            logger.info(
+                "msg channel=#%s author=%s mentioned=%s content=%r",
+                ch_name,
+                message.author.id,
+                mentioned,
+                (message.content or "")[:160],
+            )
+            if mentioned:
+                ask = self.get_cog("AskCommands")
+                if ask is None:
+                    logger.error("AskCommands cog not loaded — cogs=%s", list(self.cogs.keys()))
+                    try:
+                        await message.reply(
+                            "Chat chưa sẵn sàng (cog missing). Restart bot giúp mình.",
+                            mention_author=False,
+                        )
+                    except discord.HTTPException:
+                        pass
+                else:
+                    await ask.handle_mention(message)  # type: ignore[attr-defined]
+        await self.process_commands(message)
 
     @tasks.loop(minutes=3)
     async def periodic_cycle(self) -> None:
@@ -224,6 +272,24 @@ def main() -> None:
             await bot.start(settings.token)
 
     asyncio.run(runner())
+
+
+def _is_bot_ping(
+    message: discord.Message,
+    bot_user: discord.ClientUser,
+    me: discord.Member | None,
+) -> bool:
+    if any(u.id == bot_user.id for u in message.mentions):
+        return True
+    content = message.content or ""
+    if f"<@{bot_user.id}>" in content or f"<@!{bot_user.id}>" in content:
+        return True
+    # Discord UI looks similar for @role vs @bot — accept the bot's roles too
+    if me is not None and message.role_mentions:
+        bot_roles = {r.id for r in me.roles if not r.is_default()}
+        if any(r.id in bot_roles for r in message.role_mentions):
+            return True
+    return False
 
 
 if __name__ == "__main__":
