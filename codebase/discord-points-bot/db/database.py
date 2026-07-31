@@ -106,15 +106,15 @@ class CommentRecord:
 
 @dataclass
 class UserGradeStats:
-    """Aggregated AI rubric scores for a member (averages across graded posts)."""
+    """Aggregated AI rubric scores for a member (sums across graded posts)."""
 
     user_id: str
     display_name: str
     graded_posts: int
-    avg_novelty: float
-    avg_quality: float
-    avg_interaction: float
-    avg_total: float
+    sum_novelty: float
+    sum_quality: float
+    sum_interaction: float
+    total_points: float
     needs_review_posts: int = 0
     rank: int | None = None
 
@@ -256,7 +256,7 @@ class Database:
         return None if row is None else row["finished_at"]
 
     async def fetch_leaderboard(self, *, limit: int | None = None) -> list[UserGradeStats]:
-        """Rank members by average AI total_score (latest graded draft per post)."""
+        """Rank members by cumulative AI total_score (latest graded draft per post)."""
         sql = """
         WITH latest AS (
             SELECT g.*
@@ -273,17 +273,17 @@ class Database:
                 p.author_id AS user_id,
                 MAX(p.author_name) AS display_name,
                 COUNT(*) AS graded_posts,
-                AVG(l.novelty_score) AS avg_novelty,
-                AVG(l.quality_score) AS avg_quality,
-                AVG(l.interaction_score) AS avg_interaction,
-                AVG(l.total_score) AS avg_total,
+                SUM(l.novelty_score) AS sum_novelty,
+                SUM(l.quality_score) AS sum_quality,
+                SUM(l.interaction_score) AS sum_interaction,
+                SUM(l.total_score) AS total_points,
                 SUM(CASE WHEN l.needs_review = 1 THEN 1 ELSE 0 END) AS needs_review_posts
             FROM latest l
             JOIN posts_history p ON p.post_id = l.post_id
             GROUP BY p.author_id
         )
         SELECT * FROM per_user
-        ORDER BY avg_total DESC, graded_posts DESC, display_name COLLATE NOCASE ASC
+        ORDER BY total_points DESC, graded_posts DESC, display_name COLLATE NOCASE ASC
         """
         if limit is not None:
             sql += f" LIMIT {int(limit)}"
@@ -294,10 +294,10 @@ class Database:
                 user_id=row["user_id"],
                 display_name=row["display_name"] or row["user_id"],
                 graded_posts=row["graded_posts"],
-                avg_novelty=float(row["avg_novelty"] or 0),
-                avg_quality=float(row["avg_quality"] or 0),
-                avg_interaction=float(row["avg_interaction"] or 0),
-                avg_total=float(row["avg_total"] or 0),
+                sum_novelty=float(row["sum_novelty"] or 0),
+                sum_quality=float(row["sum_quality"] or 0),
+                sum_interaction=float(row["sum_interaction"] or 0),
+                total_points=float(row["total_points"] or 0),
                 needs_review_posts=int(row["needs_review_posts"] or 0),
                 rank=idx,
             )

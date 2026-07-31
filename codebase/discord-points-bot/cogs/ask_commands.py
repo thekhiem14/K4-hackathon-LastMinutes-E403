@@ -171,9 +171,9 @@ class AskCommands(commands.Cog):
         else:
             parts.append(
                 f"Điểm của {display_name}: hạng #{stats.rank}, "
-                f"tổng TB {stats.avg_total:.2f}, "
-                f"mới {stats.avg_novelty:.1f}, CL {stats.avg_quality:.1f}, "
-                f"TT {stats.avg_interaction:.1f}, {stats.graded_posts} bài."
+                f"tổng cộng dồn {stats.total_points:.2f}, "
+                f"mới {stats.sum_novelty:.1f}, CL {stats.sum_quality:.1f}, "
+                f"TT {stats.sum_interaction:.1f}, {stats.graded_posts} bài."
             )
 
         wants_posts = bool(_POST_TOPIC_RE.search(question)) or bool(
@@ -187,9 +187,9 @@ class AskCommands(commands.Cog):
             board = await self.db.fetch_leaderboard(limit=8)
             if board:
                 lines = [
-                    f"#{e.rank} {e.display_name}: {e.avg_total:.2f} "
-                    f"(mới {e.avg_novelty:.1f}, CL {e.avg_quality:.1f}, "
-                    f"TT {e.avg_interaction:.1f}, {e.graded_posts} bài)"
+                    f"#{e.rank} {e.display_name}: {e.total_points:.2f} "
+                    f"(mới {e.sum_novelty:.1f}, CL {e.sum_quality:.1f}, "
+                    f"TT {e.sum_interaction:.1f}, {e.graded_posts} bài)"
                     for e in board
                 ]
                 parts.append("Bảng xếp hạng (top):\n" + "\n".join(lines))

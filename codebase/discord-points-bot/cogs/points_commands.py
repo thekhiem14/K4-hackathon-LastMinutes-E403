@@ -44,8 +44,8 @@ class PointsCommands(commands.Cog):
             title="📊 Điểm AI rubric của bạn",
             description=(
                 f"Cho {interaction.user.mention}\n"
-                "_Trung bình các bài đã được AI chấm_\n"
-                "Tính mới 40% · Chất lượng 40% · Tương tác 20% (có trần +1.5)"
+                "_Tổng điểm cộng dồn từ các bài đã được AI chấm_\n"
+                "Tính mới 40% · Chất lượng 40% · Tương tác 20% (có trần +1.5 / bài)"
             ),
             color=EMBED_COLOR,
             timestamp=datetime.now(timezone.utc),
@@ -53,7 +53,7 @@ class PointsCommands(commands.Cog):
         for label, value in breakdown_lines(stats):
             embed.add_field(name=label, value=value, inline=False)
         embed.add_field(name="Hạng", value=f"#{stats.rank}" if stats.rank else "—", inline=True)
-        embed.add_field(name="Tổng (TB)", value=f"**{stats.avg_total:.2f}**", inline=True)
+        embed.add_field(name="Tổng điểm", value=f"**{stats.total_points:.2f}**", inline=True)
 
         await interaction.followup.send(
             content=f"{interaction.user.mention} đây là điểm AI của bạn:",
@@ -106,8 +106,8 @@ class PointsCommands(commands.Cog):
 
 def _leaderboard_embed(board: list[UserGradeStats]) -> discord.Embed:
     lines = [
-        f"**#{e.rank}** {e.display_name} — **{e.avg_total:.2f}** "
-        f"(mới {e.avg_novelty:.1f} · CL {e.avg_quality:.1f} · TT {e.avg_interaction:.1f} · {e.graded_posts} bài)"
+        f"**#{e.rank}** {e.display_name} — **{e.total_points:.2f}** "
+        f"(mới {e.sum_novelty:.1f} · CL {e.sum_quality:.1f} · TT {e.sum_interaction:.1f} · {e.graded_posts} bài)"
         for e in board[:TOP_N]
     ]
     embed = discord.Embed(
@@ -117,7 +117,7 @@ def _leaderboard_embed(board: list[UserGradeStats]) -> discord.Embed:
         timestamp=datetime.now(timezone.utc),
     )
     footer = (
-        f"Top {TOP_N}/{len(board)} theo tổng TB — CSV đính kèm"
+        f"Top {TOP_N}/{len(board)} theo tổng điểm cộng dồn — CSV đính kèm"
         if len(board) > TOP_N
         else f"{len(board)} thành viên — CSV đính kèm"
     )
@@ -134,10 +134,10 @@ def _leaderboard_csv(board: list[UserGradeStats]) -> discord.File:
             "user_id",
             "display_name",
             "graded_posts",
-            "avg_novelty",
-            "avg_quality",
-            "avg_interaction",
-            "avg_total",
+            "sum_novelty",
+            "sum_quality",
+            "sum_interaction",
+            "total_points",
             "needs_review_posts",
         ]
     )
@@ -148,10 +148,10 @@ def _leaderboard_csv(board: list[UserGradeStats]) -> discord.File:
                 e.user_id,
                 e.display_name,
                 e.graded_posts,
-                f"{e.avg_novelty:.2f}",
-                f"{e.avg_quality:.2f}",
-                f"{e.avg_interaction:.2f}",
-                f"{e.avg_total:.2f}",
+                f"{e.sum_novelty:.2f}",
+                f"{e.sum_quality:.2f}",
+                f"{e.sum_interaction:.2f}",
+                f"{e.total_points:.2f}",
                 e.needs_review_posts,
             ]
         )
