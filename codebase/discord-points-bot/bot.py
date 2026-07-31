@@ -19,6 +19,7 @@ from discord.ext import commands, tasks
 from ai.openrouter_client import OpenRouterClient
 from cogs.ask_commands import AskCommands
 from cogs.coach_commands import CoachCommands
+from cogs.forum_censor import ForumCensor
 from cogs.points_commands import PointsCommands
 from config import Settings, load_settings
 from db.database import Database
@@ -57,6 +58,7 @@ class GradingBot(commands.Bot):
         await self.add_cog(CoachCommands(self))
         await self.add_cog(PointsCommands(self, self.db))
         await self.add_cog(AskCommands(self, self.db))
+        await self.add_cog(ForumCensor(self))
 
         guild = discord.Object(id=self.settings.guild_id)
         self.tree.copy_global_to(guild=guild)
