@@ -12,7 +12,6 @@ from pipeline.censor import censor_post
 
 logger = logging.getLogger(__name__)
 
-_ALLOW_EMOJI = "✅"
 _PROCESSED: set[int] = set()
 _PROCESSED_MAX = 500
 
@@ -71,10 +70,6 @@ class ForumCensor(commands.Cog):
         )
 
         if result.allowed:
-            try:
-                await starter.add_reaction(_ALLOW_EMOJI)
-            except discord.HTTPException:
-                logger.warning("censor: could not react on %s", thread.id)
             return
 
         await self._reject(thread, starter.author, result.reason)

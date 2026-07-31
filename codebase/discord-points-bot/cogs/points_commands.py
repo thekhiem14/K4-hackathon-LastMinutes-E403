@@ -12,12 +12,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from db.database import Database, UserGradeStats
-from scoring.points import breakdown_lines
 
 logger = logging.getLogger(__name__)
 
-EMBED_COLOR = 0xE39C6B
+EMBED_COLOR = 0x0F766E
+PODIUM_COLOR = 0xCA8A04
 TOP_N = 15
+_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
 class PointsCommands(commands.Cog):
@@ -41,26 +42,8 @@ class PointsCommands(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
-            title="📊 Điểm AI rubric của bạn",
-            description=(
-                f"Cho {interaction.user.mention}\n"
-                "_Tổng điểm cộng dồn từ các bài đã được AI chấm_\n"
-                "Tính mới 40% · Chất lượng 40% · Tương tác 20% (có trần +1.5 / bài)"
-            ),
-            color=EMBED_COLOR,
-            timestamp=datetime.now(timezone.utc),
-        )
-        for label, value in breakdown_lines(stats):
-            embed.add_field(name=label, value=value, inline=False)
-        embed.add_field(name="Hạng", value=f"#{stats.rank}" if stats.rank else "—", inline=True)
-        embed.add_field(name="Tổng điểm", value=f"**{stats.total_points:.2f}**", inline=True)
-
-        await interaction.followup.send(
-            content=f"{interaction.user.mention} đây là điểm AI của bạn:",
-            embed=embed,
-            ephemeral=True,
-        )
+        embed = _mypoints_embed(interaction.user, stats)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="report",
@@ -72,17 +55,18 @@ class PointsCommands(commands.Cog):
         board = await self.db.fetch_leaderboard()
         if not board:
             await interaction.followup.send(
-                f"{interaction.user.mention} chưa có bản nháp AI nào (`grades`). "
-                "Chấm bài bằng post mới hoặc `/regrade`.",
+                "Chưa có bài nào được AI chấm (`grades`). "
+                "Đăng bài mới trên chia-sẻ hoặc dùng `/regrade`.",
                 ephemeral=True,
             )
             return
 
-        embed = _leaderboard_embed(board)
+        if interaction.guild is not None:
+            await _apply_display_names(board, interaction.guild)
+        embeds = _report_embeds(board, guild=interaction.guild)
         csv_file = _leaderboard_csv(board)
         await interaction.followup.send(
-            content=f"{interaction.user.mention} báo cáo AI rubric — chia-sẻ:",
-            embed=embed,
+            embeds=embeds,
             file=csv_file,
             ephemeral=True,
         )
@@ -108,25 +92,97 @@ class PointsCommands(commands.Cog):
             await interaction.response.send_message(msg, ephemeral=True)
 
 
-def _leaderboard_embed(board: list[UserGradeStats]) -> discord.Embed:
-    lines = [
-        f"**#{e.rank}** {e.display_name} — **{e.total_points:.2f}** "
-        f"(mới {e.sum_novelty:.1f} · CL {e.sum_quality:.1f} · TT {e.sum_interaction:.1f} · {e.graded_posts} bài)"
-        for e in board[:TOP_N]
-    ]
+async def _apply_display_names(
+    board: list[UserGradeStats],
+    guild: discord.Guild,
+) -> None:
+    """Replace stored names with each member's current server display name."""
+    for entry in board:
+        try:
+            uid = int(entry.user_id)
+        except ValueError:
+            continue
+        member = guild.get_member(uid)
+        if member is None:
+            try:
+                member = await guild.fetch_member(uid)
+            except discord.HTTPException:
+                member = None
+        if member is not None:
+            entry.display_name = member.display_name
+
+
+def _mypoints_embed(user: discord.abc.User, stats: UserGradeStats) -> discord.Embed:
+    rank = f"#{stats.rank}" if stats.rank else "—"
     embed = discord.Embed(
-        title="🏆 Bảng xếp hạng AI rubric — chia-sẻ",
-        description="\n".join(lines),
+        title="Điểm AI rubric của bạn",
+        description=(
+            f"{user.mention}\n"
+            "Cộng dồn từ các bài đã chấm · "
+            "mới **40%** · chất lượng **40%** · tương tác **20%**"
+        ),
         color=EMBED_COLOR,
         timestamp=datetime.now(timezone.utc),
     )
-    footer = (
-        f"Top {TOP_N}/{len(board)} theo tổng điểm cộng dồn — CSV đính kèm"
-        if len(board) > TOP_N
-        else f"{len(board)} thành viên — CSV đính kèm"
+    embed.set_author(
+        name=getattr(user, "display_name", user.name),
+        icon_url=user.display_avatar.url,
     )
-    embed.set_footer(text=footer)
+    embed.add_field(name="Hạng", value=f"**{rank}**", inline=True)
+    embed.add_field(name="Tổng điểm", value=f"**{stats.total_points:.2f}**", inline=True)
+    embed.add_field(name="Bài đã chấm", value=f"**{stats.graded_posts}**", inline=True)
+    embed.add_field(name="Tính mới", value=f"{stats.sum_novelty:.1f}", inline=True)
+    embed.add_field(name="Chất lượng", value=f"{stats.sum_quality:.1f}", inline=True)
+    embed.add_field(name="Tương tác", value=f"{stats.sum_interaction:.1f}", inline=True)
+    if stats.needs_review_posts:
+        embed.add_field(
+            name="Bài bị flag",
+            value=str(stats.needs_review_posts),
+            inline=True,
+        )
+    embed.set_footer(text="Lab05 · chia-sẻ")
     return embed
+
+
+def _report_embeds(
+    board: list[UserGradeStats],
+    *,
+    guild: discord.Guild | None,
+) -> list[discord.Embed]:
+    total_posts = sum(e.graded_posts for e in board)
+    top = board[0]
+
+    lines: list[str] = []
+    for e in board[:TOP_N]:
+        rank_badge = _MEDALS.get(e.rank or 0, f"`#{e.rank}`")
+        lines.append(
+            f"{rank_badge} **{e.display_name}** — **{e.total_points:.2f}** pts\n"
+            f"-# {e.graded_posts} bài · mới {e.sum_novelty:.1f} · "
+            f"chất lượng {e.sum_quality:.1f} · tương tác {e.sum_interaction:.1f} · "
+            f"ID {e.user_id}"
+        )
+    if len(board) > TOP_N:
+        lines.append(f"-# … và {len(board) - TOP_N} thành viên nữa (xem CSV)")
+
+    embed = discord.Embed(
+        title="🏆 Báo cáo AI rubric — chia-sẻ",
+        description=(
+            f"**{len(board)}** thành viên · **{total_posts}** bài đã chấm · "
+            f"dẫn đầu **{top.display_name}**\n\n"
+            + "\n".join(lines)
+        ),
+        color=PODIUM_COLOR,
+        timestamp=datetime.now(timezone.utc),
+    )
+    if guild is not None:
+        embed.set_author(name=guild.name, icon_url=guild.icon.url if guild.icon else None)
+    embed.set_footer(
+        text=(
+            f"Top {min(TOP_N, len(board))}/{len(board)} · "
+            "mới 40% · CL 40% · TT 20% · CSV đầy đủ đính kèm"
+        )
+    )
+    return [embed]
 
 
 def _leaderboard_csv(board: list[UserGradeStats]) -> discord.File:
