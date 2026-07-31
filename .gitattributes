@@ -1,0 +1,11 @@
+# Chuan hoa xuong dong: git luu LF trong repo, checkout theo he dieu hanh.
+# Muc dich: tranh tinh trang moi file bi bao "modified" chi vi Windows luu CRLF.
+* text=auto eol=lf
+
+# File nhi phan — khong dung cham vao
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.zip binary

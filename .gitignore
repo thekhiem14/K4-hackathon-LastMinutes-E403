@@ -1,8 +1,16 @@
 .DS_Store
 node_modules/
 *.env
+.env
 .venv/
 venv/
 __pycache__/
 *.pyc
 codebase/discord-points-bot/data/
+
+# Data pack do BTC cấp — quy dinh bao mat: khong commit vao repo nop bai.
+# Giu ban local de lam viec, khong dua len git.
+data/
+
+# Ket qua chay eval co the chua trich doan dai tu data pack
+eval/raw_outputs/
