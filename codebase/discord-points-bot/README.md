@@ -26,7 +26,7 @@ AI qua **OpenRouter**:
 - Chat: `google/gemini-2.5-flash`
 - Embeddings: `openai/text-embedding-3-small`
 
-## Cycle (every 3 minutes by default)
+## Cycle (every 10 seconds by default)
 
 1. Sync new/updated posts from `chia-sẻ` → `posts_history`
 2. AI-score any posts not graded yet → `grades`

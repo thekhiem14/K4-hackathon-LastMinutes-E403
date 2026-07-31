@@ -1,7 +1,7 @@
 """
 Discord AI Grading Bot — grades forum posts with the AI rubric.
 
-Every SYNC_INTERVAL_MINUTES (default 3):
+Every SYNC_INTERVAL_SECONDS (default 10):
   1) Sync new posts from chia-sẻ into posts_history
   2) Score any posts that are not graded yet
   3) Student scores (/mypoints, /report) update from the grades table
@@ -65,10 +65,10 @@ class GradingBot(commands.Bot):
         synced = await self.tree.sync(guild=guild)
         logger.info("Synced %s guild slash command(s)", len(synced))
 
-        minutes = self.settings.sync_interval_minutes
-        self.periodic_cycle.change_interval(minutes=minutes)
+        seconds = self.settings.sync_interval_seconds
+        self.periodic_cycle.change_interval(seconds=seconds)
         self.periodic_cycle.start()
-        logger.info("Periodic sync+grade cycle every %s minute(s)", minutes)
+        logger.info("Periodic sync+grade cycle every %s second(s)", seconds)
 
     async def close(self) -> None:
         if self.periodic_cycle.is_running():
@@ -126,7 +126,7 @@ class GradingBot(commands.Bot):
                     await ask.handle_mention(message)  # type: ignore[attr-defined]
         await self.process_commands(message)
 
-    @tasks.loop(minutes=3)
+    @tasks.loop(seconds=10)
     async def periodic_cycle(self) -> None:
         await self.run_cycle(reason="scheduled")
 

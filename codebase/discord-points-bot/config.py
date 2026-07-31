@@ -29,7 +29,7 @@ class Settings:
     guild_id: int
     forum_channel_id: int
     openrouter_api_key: str | None
-    sync_interval_minutes: int
+    sync_interval_seconds: int
     database_path: Path
     chat_model: str
     embed_model: str
@@ -41,7 +41,7 @@ def load_settings() -> Settings:
         raise SystemExit("Missing DISCORD_TOKEN. Copy .env.example → .env and fill it in.")
 
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "").strip() or None
-    sync_interval = int(os.getenv("SYNC_INTERVAL_MINUTES", "3"))
+    sync_interval = int(os.getenv("SYNC_INTERVAL_SECONDS", "10"))
     db_path = Path(os.getenv("DATABASE_PATH", "./data/grades.db")).expanduser().resolve()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -50,7 +50,7 @@ def load_settings() -> Settings:
         guild_id=_require_int("GUILD_ID"),
         forum_channel_id=_require_int("FORUM_CHANNEL_ID"),
         openrouter_api_key=openrouter_api_key,
-        sync_interval_minutes=max(1, sync_interval),
+        sync_interval_seconds=max(5, sync_interval),
         database_path=db_path,
         chat_model=os.getenv("OPENROUTER_CHAT_MODEL", OPENROUTER_CHAT_MODEL).strip(),
         embed_model=os.getenv("OPENROUTER_EMBED_MODEL", OPENROUTER_EMBED_MODEL).strip(),
